@@ -1,7 +1,7 @@
 ## gym_px4
 openai/gym wrapper for PX4 Gazebo SITL using MAVSDK and pygazebo
 
-work in progress - at the moment gazebo freezes after a while, maybe due to asyncio overloading, working on a fix.
+work in progress - somtimes gazebo freezes after multiple simulations, maybe due to asyncio overloading, working on a fix.
 
 Installation:
 follow the instructions to install gazebo with px4 sitl: https://dev.px4.io/v1.9.0/en/simulation/gazebo.html 
