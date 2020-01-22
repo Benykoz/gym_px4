@@ -6,7 +6,7 @@ work in progress - somtimes gazebo freezes after multiple simulations, maybe due
 ## Installation:
 follow the instructions to install gazebo with px4 sitl: https://dev.px4.io/v1.9.0/en/simulation/gazebo.html 
 
-modify the step size in /Firmware/Tools/sitl_gazebo/worlds/iris.world to 0.001 and real time factor and update rate according to your computer:
+modify the max_step_size, real_time_factor and real_time_update_rate in /Firmware/Tools/sitl_gazebo/worlds/iris.world :
 
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1</real_time_factor>
