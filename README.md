@@ -16,7 +16,7 @@ For the moment the environment is modified for contorl on the z axis only.
 you can easily modify for control around all axis by modifying gymPX4_env.py
 
 
-Each time the simulation is reset a new initial and desired heigh is generated.
+Each time the simulation is reset a new initial and desired height is generated.
 
 Action space = [pitch rate[-1..1], roll rate[-1..1], yaw rate[-1..1], thrust[0..1]] 
 
