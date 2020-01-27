@@ -4,15 +4,11 @@ openai/gym wrapper for PX4 Gazebo SITL using MAVSDK and pygazebo
 work in progress - somtimes gazebo freezes after multiple simulations, maybe due to asyncio overloading, working on a fix.
 
 ## Installation:
-follow the instructions to install gazebo with px4 sitl: https://dev.px4.io/v1.9.0/en/simulation/gazebo.html 
-
-modify the max_step_size, real_time_factor and real_time_update_rate in /Firmware/Tools/sitl_gazebo/worlds/iris.world :
-
-      <max_step_size>0.001</max_step_size>
-      <real_time_factor>1</real_time_factor>
-      <real_time_update_rate>1000</real_time_update_rate>
+follow the instructions to install gazebo with px4 sitl: https://dev.px4.io/v1.9.0/en/simulation/gazebo.html or simply run this script: https://raw.githubusercontent.com/PX4/Devguide/v1.9.0/build_scripts/ubuntu_sim_ros_melodic.sh
 
 clone/download the repo and install the package using pip install -e gym-px4
+
+clone/download baselines repo and place it in parent directory
 
 ## additional info
 For the moment the environment is modified for contorl on the z axis only.
