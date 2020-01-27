@@ -20,7 +20,7 @@ Each time the simulation is reset a new initial and desired height is generated.
 
 Action space = [pitch rate[-1..1], roll rate[-1..1], yaw rate[-1..1], thrust[0..1]] 
 
-Observation space = [linear position[x,y,z], linear velocity[x,y,z], angular position[x,y,z], angular velocity[x,y,z]]
+Observation space = [linear position[x,y,z], linear velocity[x,y,z], angular position[roll,pitch,yaw], angular velocity[roll,pitch,yaw]]
 
 
 can be used to test position controllers along with gymfc (https://github.com/wil3/gymfc)
