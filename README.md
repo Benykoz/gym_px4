@@ -6,7 +6,7 @@ work in progress - somtimes gazebo freezes after multiple simulations, maybe due
 ## Installation:
 follow the instructions to install gazebo with px4 sitl: https://dev.px4.io/v1.9.0/en/simulation/gazebo.html or simply run this script: https://raw.githubusercontent.com/PX4/Devguide/v1.9.0/build_scripts/ubuntu_sim_ros_melodic.sh
 
-clone/download the repo and install the package using pip install -e gym-px4
+clone/download the repo and install the package using pip3 install -e gym-px4
 
 clone/download baselines repo and place it in parent directory
 
