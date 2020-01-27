@@ -17,23 +17,26 @@ def main():
 	ob = env.reset()
 
 	try:
+		num_tries = 1
 		Kp = 0.02
-		Kd = 0.1
-		tries = 0
+		Kd = 0.05
+		rewerds=0
 		while True:
 
 			action = 0.565 + Kp*ob[0] + Kd*ob[1]
 
 			# ob, reward, done, info = env.step(action)
 			ob, reward, done, info = env.step(action)
-			print('z: ', ob)
-			print('reward: ', reward)
-			print('done: ', done)
+			rewerds=rewerds+reward
+			sys.stdout.write("\033[F")
+			print('z_error: ', ob,'reward: ', reward, 'done: ', done)
+			
 
 			if done:
-				print('reset reason: ', info)
+				print('try number: ', num_tries, 'reset reason: ', info)
 				ob = env.reset()
-				tries+=1
+				rewerds=0
+				num_tries+=1
 	except:
 		env.land()
 
