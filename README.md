@@ -29,7 +29,11 @@ Observation space = [linear position[x,y,z], linear velocity[x,y,z], angular pos
 
 can be used to test position controllers along with gymfc (https://github.com/wil3/gymfc)
 
-Off-policy optimization algorithms that take a few seconds to update the new policy each epoch result with no new signals sent to the gazebo sim. We hence used pygazebo to pause the sim only during policy updates.
+there are 2 functions in the env that you cam use other then the default gym function:
+env.land : lands the iris (assuming px4 is not exacuting any other command)
+env.pause(True/False) : pauses/unpauses gazebo
+
+Off-policy optimization algorithms that take a few seconds to update the new policy each epoch result with no new signals sent to the gazebo sim. hence we use env.pause and env.unpause to stop the sim during policy updates.
 
 ## Lunching the example:
 run the simulation using 'make px4_sitl gazebo' (also works in headless mode)
