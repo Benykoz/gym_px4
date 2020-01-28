@@ -5,15 +5,15 @@ This is a work in progress with two current branches - master branch with which 
 
 
 ## Installation:
-follow the instructions to install gazebo with px4 sitl: https://dev.px4.io/v1.9.0/en/simulation/gazebo.html 
+follow the instructions to install gazebo with px4 sitl: https://dev.px4.io/v1.9.0/en/simulation/gazebo.html or by simply running this script: https://raw.githubusercontent.com/PX4/Devguide/v1.9.0/build_scripts/ubuntu_sim_ros_melodic.sh
 
-modify the max_step_size, real_time_factor and real_time_update_rate in /Firmware/Tools/sitl_gazebo/worlds/iris.world :
+clone/download the repo and install the package using pip install -e gym-px4
+
+-- Not neccessery currently: modify the max_step_size, real_time_factor and real_time_update_rate in /Firmware/Tools/sitl_gazebo/worlds/iris.world :
 
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1</real_time_factor>
       <real_time_update_rate>1000</real_time_update_rate>
-
-clone/download the repo and install the package using pip install -e gym-px4
 
 ## additional info
 For the moment the environment is modified for contorl on the z axis only.
