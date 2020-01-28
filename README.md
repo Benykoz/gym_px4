@@ -15,7 +15,7 @@ clone/download the repo and install the package using pip install -e gym-px4
       <real_time_factor>1</real_time_factor>
       <real_time_update_rate>1000</real_time_update_rate>
 
-## Additional info
+## Additional notes
 For the moment the environment is modified for contorl on the z axis only.
 
 you can easily modify for control around all axis by modifying gymPX4_env.py
@@ -27,8 +27,9 @@ Action space = [pitch rate[-1..1], roll rate[-1..1], yaw rate[-1..1], thrust[0..
 
 Observation space = [linear position[x,y,z], linear velocity[x,y,z], angular position[x,y,z], angular velocity[x,y,z]]
 
-
 can be used to test position controllers along with gymfc (https://github.com/wil3/gymfc)
+
+Off-policy optimization algorithms that take a few seconds to update the new policy each epoch result with no new signals sent to the gazebo sim. We hence used pygazebo to pause the sim only during policy updates.
 
 ## Lunching the example:
 run the simulation using 'make px4_sitl gazebo' (also works in headless mode)
