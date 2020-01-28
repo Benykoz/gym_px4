@@ -1,7 +1,8 @@
 # gym_px4
-openai/gym wrapper for PX4 Gazebo SITL using MAVSDK and pygazebo
+openai/gym wrapper for PX4 Gazebo SITL using MAVSDK 
 
-work in progress - somtimes gazebo freezes after multiple simulations, maybe due to asyncio overloading, working on a fix.
+This is a work in progress with two current branches - master branch with which the env.step fucntion only sends commands to the uav and the sim_step branch where the simulation is actualy discrete and env.step advances the sim one time step using pygazebo. However sometimes pygazebo causes gazebo to freeze and crash after several simulation. trying to find the problem and any help would be appriciated.
+
 
 ## Installation:
 follow the instructions to install gazebo with px4 sitl: https://dev.px4.io/v1.9.0/en/simulation/gazebo.html 
