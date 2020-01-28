@@ -15,7 +15,7 @@ clone/download the repo and install the package using pip install -e gym-px4
       <real_time_factor>1</real_time_factor>
       <real_time_update_rate>1000</real_time_update_rate>
 
-## additional info
+## Additional info
 For the moment the environment is modified for contorl on the z axis only.
 
 you can easily modify for control around all axis by modifying gymPX4_env.py
@@ -30,6 +30,6 @@ Observation space = [linear position[x,y,z], linear velocity[x,y,z], angular pos
 
 can be used to test position controllers along with gymfc (https://github.com/wil3/gymfc)
 
-## lunching the example:
+## Lunching the example:
 run the simulation using 'make px4_sitl gazebo' (also works in headless mode)
 run PD_test.py
