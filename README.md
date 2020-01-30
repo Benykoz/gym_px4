@@ -31,7 +31,8 @@ can be used to test position controllers along with gymfc (https://github.com/wi
 
 there are 2 functions in the env that you cam use other then the default gym function:
 env.land : lands the iris (assuming px4 is not exacuting any other command)
-env.pause(True/False) : pauses/unpauses gazebo
+env.pause() : pauses gazebo
+env.unpause() : unpauses gazebo    -  these can be used to pause simulation during offpolicy optimizationions
 
 Off-policy optimization algorithms that take a few seconds to update the new policy each epoch result with no new signals sent to the gazebo sim. hence we use env.pause and env.unpause to stop the sim during policy updates.
 
