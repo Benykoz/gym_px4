@@ -16,7 +16,7 @@ clone/download the repo and install the package using pip install -e gym-px4
       <real_time_update_rate>1000</real_time_update_rate>
 
 ## Additional notes
-For the moment the environment is modified for contorl on the z axis only.
+For the moment the environment is modified for control on the z axis only.
 
 you can easily modify for control around all axis by modifying gymPX4_env.py
 
