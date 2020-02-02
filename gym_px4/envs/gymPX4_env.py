@@ -32,7 +32,7 @@ async def is_armed():
 
 async def init_env():
 
-    global drone, manager, pub_world_control, home_pos, desired
+    global drone, manager, pub_world_control, home_pos
 
     drone = System()
     await drone.connect(system_address="udp://:14550")   ## connect to mavsdk
@@ -41,17 +41,17 @@ async def init_env():
             break
     await asyncio.sleep(1)
 
-    ##### this was hidden : ##################
-
     print('-- Connecting to Gazebo')
-    manager = await pygazebo.connect(('localhost', 11345))   ## connect to pygazebo
-    await asyncio.sleep(1)
+    while True:
+        try:
+            manager = await pygazebo.connect(('localhost', 11345))   ## connect to pygazebo
+            break
+        except:
+            subprocess.Popen(args='make px4_sitl gazebo', cwd='../Firmware', shell=True)
+        await asyncio.sleep(1)
     print('-- Connected')
     pub_world_control = await manager.advertise('/gazebo/default/world_control','gazebo.msgs.WorldControl')
     await asyncio.sleep(1)
-
-
-   ##########################################
 
     async for home_pos in drone.telemetry.home():  ## get absolute home position
         home_pos = np.array([home_pos.latitude_deg, home_pos.longitude_deg, home_pos.absolute_altitude_m])
@@ -74,6 +74,7 @@ async def init_env():
             print(f"Starting offboard mode failed with error code: {error._result.result}")
             print("-- Disarming")
             await drone.action.disarm()
+
 
 async def reset_async(reset_pos):
     global manager, pub_world_control
@@ -111,7 +112,7 @@ async def reset_async(reset_pos):
             await asyncio.sleep(1)
             break
 
-        if (reset_steps+1) % 100 == 0:      ### if reset takes too long, reset simulation
+        if (reset_steps+1) % 200 == 0:      ### if reset takes too long, reset simulation
 
             subprocess.Popen(args='make px4_sitl gazebo', cwd='../Firmware', shell=True)
 
@@ -209,7 +210,7 @@ class gymPX4(gym.Env):
 
 
     def _start_sim(self):
-        subprocess.Popen(args='make px4_sitl gazebo', cwd='../Firmware', shell=True)
+        
         self.loop = asyncio.get_event_loop()
         self.loop.run_until_complete(init_env())
 
@@ -263,6 +264,7 @@ class gymPX4(gym.Env):
         #     reward+=5
         info = {"state" : ob, "action": action, "reward": reward, "step": self.steps, "reset reason": reset}
         self.steps=self.steps+1
+        print('steps: ', self.steps, 'action: ', action)
         return ob, reward, done, info
 
     def render(self):
