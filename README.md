@@ -37,4 +37,6 @@ env.unpause() : unpauses gazebo    -  these can be used to pause simulation duri
 Off-policy optimization algorithms that take a few seconds to update the new policy each epoch result with no new signals sent to the gazebo sim. hence we use env.pause and env.unpause to stop the sim during policy updates.
 
 ## Lunching the example:
+You can run 'make px4_sitl gazebo' from Firmware folder to see the px4 updates in a different consule.
+If gazebo is not open the px4_gym initiation will open the default iris model using 'make px4_sitl gazebo'
 run PD_test.py
