@@ -1,7 +1,8 @@
 # gym_px4
-openai/gym wrapper for PX4 Gazebo SITL using MAVSDK 
+openai/gym wrapper for PX4 Gazebo SITL using MAVSDK
 
-This is a work in progress with two current branches - master branch with which the env.step fucntion only sends commands to the uav and the sim_step branch where the simulation is actualy discrete and env.step advances the sim one time step using pygazebo. However sometimes pygazebo causes gazebo to freeze and crash after several simulation. trying to find the problem and any help would be appriciated.
+###work in progress### 
+The env.step fucntion only sends mavlink commands to the drone while the simulation runs freely. using Pygazebo we can pause the simulation and advance it step by step as a real gym interface should be, however using WorldControl().step from pygazebo seems to crash gazebo oftenly. any help would be appriciated.
 
 
 ## Installation:
@@ -20,8 +21,7 @@ For the moment the environment is modified for control on the z axis only.
 
 you can easily modify for control around all axis by modifying gymPX4_env.py
 
-
-Each time the simulation is reset a new initial and desired heigh is generated.
+Each time the simulation is reset a new initial and desired height is generated.
 
 Action space = [pitch rate[-1..1], roll rate[-1..1], yaw rate[-1..1], thrust[0..1]] 
 
@@ -29,7 +29,7 @@ Observation space = [linear position[x,y,z], linear velocity[x,y,z], angular pos
 
 can be used to test position controllers along with gymfc (https://github.com/wil3/gymfc)
 
-there are 2 functions in the env that you cam use other then the default gym function:
+there are 3 functions in the env that you cam use other then the default gym function:
 env.land : lands the iris (assuming px4 is not exacuting any other command)
 env.pause() : pauses gazebo
 env.unpause() : unpauses gazebo    -  these can be used to pause simulation during offpolicy optimizationions
@@ -37,5 +37,4 @@ env.unpause() : unpauses gazebo    -  these can be used to pause simulation duri
 Off-policy optimization algorithms that take a few seconds to update the new policy each epoch result with no new signals sent to the gazebo sim. hence we use env.pause and env.unpause to stop the sim during policy updates.
 
 ## Lunching the example:
-run the simulation using 'make px4_sitl gazebo' (also works in headless mode)
 run PD_test.py
