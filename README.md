@@ -1,5 +1,5 @@
 # gym_px4
-openai/gym wrapper for PX4 Gazebo SITL using MAVSDK
+openai/gym enviornment for PX4 Gazebo SITL using MAVSDK
 
 ###work in progress### 
 The env.step fucntion only sends mavlink commands to the drone while the simulation runs freely. using Pygazebo we can pause the simulation and advance it step by step as a real gym interface should be, however using WorldControl().step from pygazebo seems to crash gazebo oftenly. any help would be appriciated.
