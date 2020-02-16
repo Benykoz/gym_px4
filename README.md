@@ -25,8 +25,8 @@ run 'sudo pip3 install gym'
 clone/download the repo and install the package using pip install -e gym-px4
 
 # Using the Environment
-navigate to the px4 Firmware diractory and run 'make px4_sitl gazebo'.
-In a new terminal run 'roslaunch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"'
+Navigate to the px4 Firmware diractory and run `make px4_sitl gazebo`.
+In a new terminal run `roslaunch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"`
 
 Then the environment can be used as anyother gym environments. This can be done by doing the following in your script
 ```
