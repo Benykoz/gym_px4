@@ -1,271 +1,305 @@
 #!/usr/bin/env python3
-import gym
-from gym import spaces
 
-import numpy as np
-import asyncio
 import math
-import subprocess
+import numpy as np
+import rospy
 import time
-
-from mavsdk import System
-from mavsdk import (OffboardError, PositionNedYaw, ActuatorControl, AttitudeRate)
+import subprocess
+import sys
+import asyncio
+from threading import Thread
 
 import pygazebo
 from pygazebo import Manager
 from pygazebo.msg import world_control_pb2
 from pygazebo.msg.world_control_pb2 import WorldControl
-from pygazebo.msg.world_stats_pb2 import WorldStatistics
 
-def lat_lon_to_coords(cords):
-    radius_of_earth = 6371000
-    rad_lat = math.radians(cords[0])
-    rad_lon = math.radians(cords[1])
-    x = radius_of_earth * math.cos(rad_lat) * math.cos(rad_lon)
-    y = radius_of_earth * math.cos(rad_lat) * math.sin(rad_lon)
-    z = cords[2]
-    return x, y, z
+from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import TwistStamped
+from geometry_msgs.msg import Vector3
+from mavros_msgs.msg import ActuatorControl
+from mavros_msgs.msg import AttitudeTarget
+from mavros_msgs.msg import Thrust
+from mavros_msgs.msg import State
+from mavros_msgs.srv import SetMode
+from mavros_msgs.srv import SetModeRequest
+from mavros_msgs.srv import SetModeResponse
+from mavros_msgs.srv import CommandBool
+from mavros_msgs.srv import CommandBoolRequest
+from mavros_msgs.srv import CommandBoolResponse
+from mavros_msgs.srv import StreamRate, StreamRateRequest
+from sensor_msgs.msg import Imu
+from std_msgs.msg import Header
+from std_srvs.srv import Empty, EmptyRequest
+import mavros.setpoint
 
-async def is_armed():
-        async for is_armed in drone.telemetry.armed():  ## check arm status
-            return is_armed
-
-async def init_env():
-
-    global drone, manager, pub_world_control, home_pos
-
-    drone = System()
-    await drone.connect(system_address="udp://:14550")   ## connect to mavsdk
-    async for state in drone.core.connection_state():
-        if state.is_connected:
-            break
-    await asyncio.sleep(1)
-
-    print('-- Connecting to Gazebo')
-    while True:
-        try:
-            manager = await pygazebo.connect(('localhost', 11345))   ## connect to pygazebo
-            break
-        except:
-            subprocess.Popen(args='make px4_sitl gazebo', cwd='../Firmware', shell=True)
-        await asyncio.sleep(1)
-    print('-- Connected')
-    pub_world_control = await manager.advertise('/gazebo/default/world_control','gazebo.msgs.WorldControl')
-    await asyncio.sleep(1)
-
-    async for home_pos in drone.telemetry.home():  ## get absolute home position
-        home_pos = np.array([home_pos.latitude_deg, home_pos.longitude_deg, home_pos.absolute_altitude_m])
-        home_pos=np.array(lat_lon_to_coords(home_pos))
-        break
-
-    asyncio.ensure_future(get_lin_pos())  ## initiate linear position stream
-    asyncio.ensure_future(get_lin_vel())  ## initiate linear velocity stream
-
-    armed = await is_armed()
-
-    if not armed:  ## if not armed, arm and change to OFFBOARD mode
-        print("-- Arming")
-        await drone.action.arm()
-        await drone.offboard.set_position_ned(PositionNedYaw(0.0, 0.0, 0.0, 0.0))
-        print("-- Starting offboard")
-        try:
-            await drone.offboard.start()
-        except OffboardError as error:
-            print(f"Starting offboard mode failed with error code: {error._result.result}")
-            print("-- Disarming")
-            await drone.action.disarm()
+import gym
+from gym import spaces
 
 
-async def reset_async(reset_pos):
-    global manager, pub_world_control
-    reset_steps = 0
+def quaternion_to_euler(x, y, z, w):
 
-    # unpause_msg = WorldControl()
-    # unpause_msg.pause = False
-    # await asyncio.sleep(0.001)
-    # await pub_world_control.publish(unpause_msg)
+        t0 = +2.0 * (w * x + y * z)
+        t1 = +1.0 - 2.0 * (x * x + y * y)
+        X = math.degrees(math.atan2(t0, t1))
 
-    print('-- Resetting position')
+        t2 = +2.0 * (w * y - z * x)
+        t2 = +1.0 if t2 > +1.0 else t2
+        t2 = -1.0 if t2 < -1.0 else t2
+        Y = math.degrees(math.asin(t2))
 
-    await drone.offboard.set_position_ned(PositionNedYaw(reset_pos[0],reset_pos[1],-reset_pos[2],reset_pos[3]))
-    while True:
+        t3 = +2.0 * (w * z + x * y)
+        t4 = +1.0 - 2.0 * (y * y + z * z)
+        Z = math.degrees(math.atan2(t3, t4))
 
-        armed = await is_armed()
-
-        await asyncio.sleep(0.1)
-        if not armed:                    ## if not armed, arm and change to OFFBOARD mode
-            print("-- Arming")
-            await drone.action.arm()
-            await drone.offboard.set_position_ned(PositionNedYaw(0.0, 0.0, 0.0, 0.0))
-            await asyncio.sleep(0.1)
-            print("-- Starting offboard")
-            try:
-                await drone.offboard.start()
-            except OffboardError as error:
-                print(f"Starting offboard mode failed with error code: {error._result.result}")
-                print("-- Disarming")
-                await drone.action.disarm()
-            await asyncio.sleep(0.1)
-            await drone.offboard.set_position_ned(PositionNedYaw(reset_pos[0],reset_pos[1],-reset_pos[2],reset_pos[3]))
-
-        if np.abs(np.linalg.norm(lin_pos[2] - reset_pos[2])) < 0.7 and np.abs(np.linalg.norm(lin_vel)) < 0.2 :   ### wait for drone to reach desired position
-            await asyncio.sleep(1)
-            break
-
-        if (reset_steps+1) % 200 == 0:      ### if reset takes too long, reset simulation
-
-            subprocess.Popen(args='make px4_sitl gazebo', cwd='../Firmware', shell=True)
-
-            await asyncio.sleep(10)
-            print('-- Connecting to Gazebo')
-            manager = await pygazebo.connect(('localhost', 11345))   ## connect to pygazebo
-            await asyncio.sleep(1)
-            print('-- Connected')
-            pub_world_control = await manager.advertise('/gazebo/default/world_control','gazebo.msgs.WorldControl')
-            await asyncio.sleep(1)
-
-        reset_steps+=1
-
-    print('-- Position reset')
-
-    # pause_msg = WorldControl()
-    # pause_msg.pause = True
-    # await asyncio.sleep(0.001)
-    # await pub_world_control.publish(pause_msg)
-
-async def step_async(action):
-
-    # step_msg = WorldControl()
-    # step_msg.step = True
-    # await asyncio.sleep(0.001)
-    # await pub_world_control.publish(step_msg)  ## perform pone step in gazebo
-
-    action = [0,0,0,action]
-    #### control set_point_attitude_rate: ####
-    await drone.offboard.set_attitude_rate(AttitudeRate(action[0],action[1],action[2],action[3]))   ## publish action in deg/s, thrust [0:1]
-    
-    #### control set_point_actuator_control: ####
-    # await drone.offboard.set_actuator_control(ActuatorControl(action[0],action[1],action[2],action[3]))
-
-async def get_lin_pos():  ## in m
-    async for position in drone.telemetry.position():
-        global lin_pos
-        glob_pos = np.array([position.latitude_deg, position.longitude_deg, position.absolute_altitude_m])
-        lin_pos = np.array(lat_lon_to_coords(glob_pos)) - home_pos
-        # return lin_pos
-
-async def get_lin_vel():  ## in m/s
-    async for vel in drone.telemetry.ground_speed_ned():
-        global lin_vel
-        lin_vel = np.array([vel.velocity_north_m_s, vel.velocity_east_m_s, vel.velocity_down_m_s])
-        # return lin_vel
-
-async def get_ang_pos(): ## in rad
-    async for ang_pos in drone.telemetry.attitude_euler():
-        return [ang_pos.roll_deg, ang_pos.pitch_deg, ang_pos.yaw_deg]
-
-async def get_ang_vel():  ## in rad/s
-    async for ang_vel in drone.telemetry.attitude_angular_velocity_body():
-        return np.array([ang_vel.roll_rad_s, ang_vel.pitch_rad_s, ang_vel.yaw_rad_s])
-
-
-async def asyland():
-    print('-- Landing')
-    # await asynunpause()
-    await asyncio.sleep(0.5)
-    await drone.action.land()
-
-async def asynpause():
-    pause_msg = WorldControl()
-    pause_msg.pause = True
-    await asyncio.sleep(0.001)
-    await pub_world_control.publish(pause_msg)
-
-async def asynunpause():
-    pause_msg = WorldControl()
-    pause_msg.pause = False
-    await asyncio.sleep(0.001)
-    await pub_world_control.publish(pause_msg)
-
+        return X, Y, Z
 
 class gymPX4(gym.Env):
-    steps = 0
-    success_count = 0
-    def __init__(self):
-        self._start_sim()
 
-        self.min_action = 0
+    def __init__(self):
+
+        ### define gym spaces ###
+        self.min_action = 0.0
         self.max_action = 1.0
 
         self.min_position = 0.1
         self.max_position = 25
         self.max_speed = 2
 
-        self.low_state = np.array([self.min_position, -self.max_speed])
-        self.high_state = np.array([self.max_position, self.max_speed])
+        # self.low_state = np.array([self.min_position, -self.max_speed])
+        # self.high_state = np.array([self.max_position, self.max_speed])
+        self.low_state = np.array([self.min_position])
+        self.high_state = np.array([self.max_position])
 
         self.action_space = spaces.Box(low = self.min_action, high=self.max_action, shape=(1,), dtype=np.float32)
 
         self.observation_space = spaces.Box(low = self.low_state, high = self.high_state, dtype = np.float32)
 
+        self.current_state = State()
+        self.imu_data = Imu()
+        self.act_controls = ActuatorControl()
+        self.pose = PoseStamped()
+        self.mocap_pose = PoseStamped()
+        self.thrust_ctrl = Thrust()
+        self.attitude_target = AttitudeTarget()
+        self.local_velocity = TwistStamped()
 
-    def _start_sim(self):
+        ### define ROS messages ###
+
+        self.offb_set_mode = SetModeRequest()
+        self.offb_set_mode.custom_mode = "OFFBOARD"
+
+        self.arm_cmd = CommandBoolRequest()
+        self.arm_cmd.value = True
+
+        self.disarm_cmd = CommandBoolRequest()
+        self.disarm_cmd.value = False
+
+        ### define pygazebo messages ###
+
+        self.pause_msg = WorldControl()
+        self.pause_msg.pause = True
+
+        self.unpause_msg = WorldControl()
+        self.unpause_msg.pause = False
+
+        self.step_msg = WorldControl()
+        self.step_msg.step = True
+
+        ## ROS Subscribers
+        self.state_sub = rospy.Subscriber("/mavros/state",State, self.state_cb,queue_size=10)
+        self.imu_sub = rospy.Subscriber("/mavros/imu/data",Imu, self.imu_cb, queue_size=10)
+        self.local_pos_sub = rospy.Subscriber("/mavros/local_position/pose", PoseStamped, self.lp_cb, queue_size=10)
+        self.local_vel_sub = rospy.Subscriber("/mavros/local_position/velocity", TwistStamped, self.lv_cb, queue_size=10)
+        self.act_control_sub = rospy.Subscriber("/mavros/act_control/act_control_pub", ActuatorControl, self.act_cb,queue_size=10)
+
+        ## ROS Publishers
+        self.local_pos_pub = rospy.Publisher("/mavros/setpoint_position/local",PoseStamped,queue_size=10)
+        self.mocap_pos_pub = rospy.Publisher("/mavros/mocap/pose",PoseStamped,queue_size=10)
+        self.acutator_control_pub = rospy.Publisher("/mavros/actuator_control",ActuatorControl,queue_size=10)
+        self.setpoint_raw_pub = rospy.Publisher("/mavros/setpoint_raw/attitude",AttitudeTarget,queue_size=10)
+        self.thrust_pub = rospy.Publisher("/mavros/setpoint_attitude/thrust",Thrust,queue_size=10)
+
+        ## initiate gym enviornment and connect to pygazebo
+
+        self.init_env()
         
         self.loop = asyncio.get_event_loop()
-        self.loop.run_until_complete(init_env())
+        self.loop.run_until_complete(self.reset_pygzb())
+    
+        ## ROS Services
+
+        rospy.wait_for_service('mavros/cmd/arming')
+        self.arming_client = rospy.ServiceProxy('mavros/cmd/arming', CommandBool)
+
+        rospy.wait_for_service('mavros/set_mode')
+        self.set_mode_client = rospy.ServiceProxy('mavros/set_mode', SetMode)
+
+        rospy.wait_for_service('mavros/set_stream_rate')
+        set_stream_rate=rospy.ServiceProxy("mavros/set_stream_rate",StreamRate)
+
+        set_stream_rate(stream_id=StreamRateRequest.STREAM_ALL, message_rate=20, on_off=True)
+
+        self.setpoint_msg = mavros.setpoint.PoseStamped(header=mavros.setpoint.Header(frame_id="att_pose",stamp=rospy.Time.now()),)
+
+        self.offb_arm()
+
+    def init_env(self):
+
+        ### Initiate ROS node
+        rospy.init_node('gym_px4_mavros',anonymous=True)
+        rate =  rospy.Rate(1000.0)
+
+        print('-- Connecting to mavros')
+        while not rospy.is_shutdown() and not self.current_state.connected:
+            rate.sleep()
+            rospy.loginfo(self.current_state.connected)
+        # print("#"*80)
+        print ('-- connected')
+
+    async def reset_pygzb(self):
+        print('-- Connecting to pygazbo')
+        self.manager = await pygazebo.connect(('localhost', 11345))   ## connect to pygazebo
+        print ('-- connected')
+        self.pub_world_control = await self.manager.advertise('/gazebo/default/world_control','gazebo.msgs.WorldControl')
+        await asyncio.sleep(0.5)
 
     def reset(self):
-        self.success_count = 0
+
+        # self.loop.run_until_complete(self.unpause_asyn())  ## unpause sim for reset position
+
+        self.success_steps = 0
         self.steps=0
 
-        # desired = np.random.randint(4,10)
-        self.desired = np.round(np.random.rand()*10,2)+2
+        self.desired = 4
+        self.initial = 2
 
-        # initial = np.random.randint(2,10)
-        initial = np.round(np.random.rand()*10,2)+2
+        print('Initial: ', self.initial, 'Desired: ', self.desired)
 
-        reset_pos=[0,0,initial,0]
-        print('Initial: ', initial, 'Desired: ', self.desired)
+        reset_pos=[0,0,self.initial,0]
 
-        self.loop.run_until_complete(reset_async(reset_pos))
+        print('-- Resetting position')     
+		
+        while True:   ### wait for quad to arrive to desired position
 
-        ob = np.array([self.desired - lin_pos[2], lin_vel[2]])
+            if self.current_state.armed == False:    ## if not armed (e.g. crash landing disarm), re-arm
+                self.offb_arm()
+            
+            self.setpoint_msg.pose.position.x = reset_pos[0]
+            self.setpoint_msg.pose.position.y = reset_pos[1]
+            self.setpoint_msg.pose.position.z = reset_pos[2]
+
+            self.local_pos_pub.publish(self.setpoint_msg)  ### send desired set_point for reset
+
+            x=self.local_position.pose.position.x
+            y=self.local_position.pose.position.y
+            z=self.local_position.pose.position.z
+            lin_pos = [x,y,z]
+
+            vx=self.local_velocity.twist.linear.x
+            vy=self.local_velocity.twist.linear.y
+            vz=self.local_velocity.twist.linear.z
+            lin_vel = [vx,vy,vz]
+            
+            if np.abs(np.linalg.norm(lin_pos[2] - reset_pos[2])) < 0.2 and np.abs(np.linalg.norm(lin_vel)) < 0.2 :   ### wait for drone to reach desired position
+                time.sleep(0.2)
+                break
+
+            time.sleep(0.5)
+
+        print('-------- Position reset --------') 
+
+        x=self.local_position.pose.position.x
+        y=self.local_position.pose.position.y
+        z=self.local_position.pose.position.z
+        lin_pos = [x,y,z]
+        ob = np.array([ self.desired - lin_pos[2] ])
+
+        self.last_pos = lin_pos
+
+        # self.loop.run_until_complete(self.pause_asyn())   ## pause sim for new episode
 
         return ob  # reward, done, info can't be included
 
     def step(self, action):
 
-        self.loop.run_until_complete(step_async(action))
-        
-        reward = -2*np.abs( self.desired - lin_pos[2] ) -np.abs( lin_vel[2] )
-        ob = np.array([self.desired - lin_pos[2], lin_vel[2]])
+        start_time=time.time()
 
+        # self.loop.run_until_complete(self.step_asyn())    ## perform one sim time step
+
+		### recieve updated position
+        qx=self.local_position.pose.orientation.x
+        qy=self.local_position.pose.orientation.y
+        qz=self.local_position.pose.orientation.z
+        qw=self.local_position.pose.orientation.w
+
+        roll, pitch, yaw = quaternion_to_euler(qx,qy,qz,qw)
+        ang_pos = [roll, pitch, yaw]
+
+        while True:
+            x=self.local_position.pose.position.x
+            y=self.local_position.pose.position.y
+            z=self.local_position.pose.position.z
+            lin_pos = [x,y,z]
+            if lin_pos[2] != self.last_pos[2]:
+                break
+
+
+        ### send set_point attitude rate commands
+        self.attitude_target.type_mask = AttitudeTarget.IGNORE_ROLL_RATE | AttitudeTarget.IGNORE_PITCH_RATE | AttitudeTarget.IGNORE_YAW_RATE | AttitudeTarget.IGNORE_ATTITUDE
+        # attitude_target.type_mask = AttitudeTarget.IGNORE_ATTITUDE
+        self.attitude_target.thrust = action
+        # quad_rate = Vector3()
+        # quad_rate.x = 0
+        # quad_rate.y = 0
+        # quad_rate.z = 0
+        # attitude_target.body_rate = quad_rate
+
+        self.setpoint_raw_pub.publish(self.attitude_target)
+
+        reward = -np.power( self.desired - lin_pos[2], 2)
+
+        ob = np.array([ self.desired - lin_pos[2] ])
+        
         done = False
         reset = 'No'
-        if  np.abs(lin_pos[0]) > 5 or np.abs(lin_pos[1]) > 5 or np.abs(lin_pos[2]) > 15 or np.abs(lin_pos[2]) < 0.5 :
-            done = True
-            reset = '--------- out of bounds ----------'
-            print(reset)
-            reward = -10000
-            
-        if self.steps > 25000 :
-            done = True
-            reset = '--------- limit time steps ----------'
-            print(reset)
 
-        if  np.abs(ob[0]) < 0.2 and np.abs(ob[1]) < 0.2:
-            self.success_count=self.success_count+1
-            if self.success_count > 500:
+        if  np.abs(lin_pos[0]) > 5 or np.abs(lin_pos[1]) > 5 or lin_pos[2] > 2.5 or lin_pos[2] < 1.5 :
+            done = True
+            reset = 'out of region'
+            reward = -1000
+            print('----------------', reset, '----------------')
+
+        if self.steps > 5000 :
+            done = True
+            reset = 'limit time steps'
+            print('----------------', reset ,'----------------')
+
+        if  np.abs(ob[0]) < 0.1 :
+            self.success_steps+=1
+            if self.success_steps > 150:
                 done = True
-                reset = '---------- sim success ----------'
-                print(reset)
-                reward = +1000
-        # if  np.abs(ob[0]) < 0.2:
-        #     reward+=5
-        info = {"state" : ob, "action": action, "reward": reward, "step": self.steps, "reset reason": reset}
+                reset = 'sim success'
+                print('----------------', reset, '----------------')
+                reward += 10000
+        
         self.steps=self.steps+1
-        print('steps: ', self.steps, 'action: ', action)
+
+        self.last_pos = lin_pos
+
+        step_len=time.time()-start_time
+
+        info = {"state" : ob, "action": action, "reward": reward, "step": self.steps, "step length": step_len, "reset reason": reset}
         return ob, reward, done, info
+
+    def offb_arm(self):
+
+        if self.current_state.mode == "OFFBOARD" and self.current_state.armed == True:
+            return
+        print ('-- Enabling offboard mode and arming')
+        self.set_mode_client(0,'OFFBOARD')
+        self.arming_client(True)
+        rospy.loginfo('-- Ready to fly')
 
     def render(self):
         pass
@@ -273,12 +307,29 @@ class gymPX4(gym.Env):
     def close (self):
         pass
 
-    def land(self):
-        self.loop.run_until_complete(asyland())
+    def lp_cb(self,data):
+        self.local_position = data
 
+    def state_cb(self,data):
+        self.current_state = data
+
+    def imu_cb(self,data):
+        self.imu_data = data
+
+    def act_cb(self,data):
+        self.act_controls = data
+    
     def pause(self):
-        self.loop.run_until_complete(asynpause())
+        self.loop.run_until_complete(self.pause_asyn())
 
     def unpause(self):
-        self.loop.run_until_complete(asynunpause())
+        self.loop.run_until_complete(self.unpause_asyn())
 
+    async def pause_asyn(self):
+        await self.pub_world_control.publish(self.pause_msg)
+
+    async def unpause_asyn(self):
+        await self.pub_world_control.publish(self.unpause_msg)
+
+    async def step_asyn(self):
+        await self.pub_world_control.publish(self.step_msg)
