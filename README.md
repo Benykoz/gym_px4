@@ -1,42 +1,50 @@
 # gym_px4
-openai/gym enviornment for PX4 Gazebo SITL using MAVSDK
-
-###work in progress### 
-The env.step fucntion only sends mavlink commands to the drone while the simulation runs freely. using Pygazebo we can pause the simulation and advance it step by step as a real gym interface should be, however using WorldControl().step from pygazebo seems to crash gazebo oftenly. any help would be appriciated.
+`gym-px4` is an openai/gym environment for PX4 Gazebo SITL using MAVROS. This environment enables the use of any gym RL library (e.g. baselines, stable-baselines, spinning-up, keras-rl etc) to train low-level quadcopter controllers.
 
 
-## Installation:
+# Installation
+## Requirements
+
+- python3.6 (or 3.7) environment.
+- [ROS melodic]
+      *to troubleshoot python3 - ROS issues, I recommend https://medium.com/@beta_b0t/how-to-setup-ros-with-python-3-44a69ca36674
+- [gazebo9]
+- [gym](https://github.com/openai/gym.git) 
+- [pygazebo] (optional, currently relevant code commented)
+
+Note1. the code was tested on Ubuntu 18.04.
+
+## Install Dependencies:
 follow the instructions to install gazebo with px4 sitl: https://dev.px4.io/v1.9.0/en/simulation/gazebo.html or by simply running this script: https://raw.githubusercontent.com/PX4/Devguide/v1.9.0/build_scripts/ubuntu_sim_ros_melodic.sh
+make sure no errors are given and all dependencies are met.
+run 'sudo pip3 install rospkg catkin_pkg'
+run 'sudo pip3 install gym'
 
+
+## Install gym_px4:
 clone/download the repo and install the package using pip install -e gym-px4
 
--- Not neccessery currently: modify the max_step_size, real_time_factor and real_time_update_rate in /Firmware/Tools/sitl_gazebo/worlds/iris.world :
+# Using the Environment
+The environment can be used as anyother gym environments. This can be done by doing the following in your script
+```
+import gym
+...
 
-      <max_step_size>0.001</max_step_size>
-      <real_time_factor>1</real_time_factor>
-      <real_time_update_rate>1000</real_time_update_rate>
+env = gym.make('gym_px4:px4-v0')
+```
+`gym_px4:px4-v0-v0` is the environment ID that is registered in the gym environment.
+The environment can be also be tested using the openai baselines package, for example as the following.
+```
+python -m gym_reinmav.run --alg=ppo2 --env=gym_px4:px4-v0 --network=mlp --num_timesteps=2e7
+```
 
 ## Additional notes
-For the moment the environment is modified for control on the z axis only.
+
+The environment uses the /mavros/setpoint_raw/ publisher to control the drone. For the moment the it is modified for control on the z axis only. (meaning roll, pitch and yaw set point are ignored)
 
 you can easily modify for control around all axis by modifying gymPX4_env.py
 
-Each time the simulation is reset a new initial and desired height is generated.
+Action space = thrust[0..1]] 
 
-Action space = [pitch rate[-1..1], roll rate[-1..1], yaw rate[-1..1], thrust[0..1]] 
+Observation space = linear position[x,y,z]
 
-Observation space = [linear position[x,y,z], linear velocity[x,y,z], angular position[x,y,z], angular velocity[x,y,z]]
-
-can be used to test position controllers along with gymfc (https://github.com/wil3/gymfc)
-
-there are 3 functions in the env that you cam use other then the default gym function:
-env.land : lands the iris (assuming px4 is not exacuting any other command)
-env.pause() : pauses gazebo
-env.unpause() : unpauses gazebo    -  these can be used to pause simulation during offpolicy optimizationions
-
-Off-policy optimization algorithms that take a few seconds to update the new policy each epoch result with no new signals sent to the gazebo sim. hence we use env.pause and env.unpause to stop the sim during policy updates.
-
-## Lunching the example:
-You can run 'make px4_sitl gazebo' from Firmware folder to see the px4 updates in a different consule.
-If gazebo is not open the px4_gym initiation will open the default iris model using 'make px4_sitl gazebo'
-run PD_test.py
