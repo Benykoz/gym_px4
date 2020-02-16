@@ -31,7 +31,12 @@ import gym
 ...
 
 env = gym.make('gym_px4:px4-v0')
+...
+env.reset()
+...
+env.step(ac)
 ```
+
 `gym_px4:px4-v0-v0` is the environment ID that is registered in the gym environment.
 The environment can be also be tested using the openai baselines package, for example as the following.
 ```
