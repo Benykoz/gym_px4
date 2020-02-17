@@ -24,6 +24,7 @@ from mavros_msgs.srv import CommandBoolResponse
 from mavros_msgs.srv import StreamRate, StreamRateRequest
 from sensor_msgs.msg import Imu
 from std_msgs.msg import Header
+from std_msgs.msg import Float64
 from std_srvs.srv import Empty, EmptyRequest
 import mavros.setpoint
 
@@ -58,10 +59,12 @@ class gymPX4(gym.Env):
 
         self.min_position = 0.1
         self.max_position = 25
-        self.max_speed = 2
-	
-        self.low_state = np.array([self.min_position])
-        self.high_state = np.array([self.max_position])
+        self.max_speed = 3
+
+        self.low_state = np.array([self.min_position, -self.max_speed])
+        self.high_state = np.array([self.max_position, self.max_speed])
+        # self.low_state = np.array([self.min_position])
+        # self.high_state = np.array([self.max_position])
 
         self.action_space = spaces.Box(low = self.min_action, high=self.max_action, shape=(1,), dtype=np.float32)
 
@@ -75,6 +78,7 @@ class gymPX4(gym.Env):
         self.thrust_ctrl = Thrust()
         self.attitude_target = AttitudeTarget()
         self.local_velocity = TwistStamped()
+        self.global_velocity = TwistStamped()
 
         ### define ROS messages ###
 
@@ -91,8 +95,11 @@ class gymPX4(gym.Env):
         self.state_sub = rospy.Subscriber("/mavros/state",State, self.state_cb,queue_size=10)
         self.imu_sub = rospy.Subscriber("/mavros/imu/data",Imu, self.imu_cb, queue_size=10)
         self.local_pos_sub = rospy.Subscriber("/mavros/local_position/pose", PoseStamped, self.lp_cb, queue_size=10)
-        self.local_vel_sub = rospy.Subscriber("/mavros/local_position/velocity", TwistStamped, self.lv_cb, queue_size=10)
+        self.local_vel_sub = rospy.Subscriber("/mavros/local_position/velocity_local", TwistStamped, self.lv_cb, queue_size=10)
         self.act_control_sub = rospy.Subscriber("/mavros/act_control/act_control_pub", ActuatorControl, self.act_cb,queue_size=10)
+
+        self.global_alt_sub = rospy.Subscriber("/mavros/global_position/rel_alt", Float64, self.ra_cb, queue_size=10)
+        self.global_pos_sub = rospy.Subscriber("/mavros/global_position/gp_vel", TwistStamped, self.gv_cb, queue_size=10)
 
         ## ROS Publishers
         self.local_pos_pub = rospy.Publisher("/mavros/setpoint_position/local",PoseStamped,queue_size=10)
@@ -100,11 +107,13 @@ class gymPX4(gym.Env):
         self.acutator_control_pub = rospy.Publisher("/mavros/actuator_control",ActuatorControl,queue_size=10)
         self.setpoint_raw_pub = rospy.Publisher("/mavros/setpoint_raw/attitude",AttitudeTarget,queue_size=10)
         self.thrust_pub = rospy.Publisher("/mavros/setpoint_attitude/thrust",Thrust,queue_size=10)
+        
 
-        ## initiate gym enviornment and connect to pygazebo
+        ## initiate gym enviornment
 
         self.init_env()
 
+    
         ## ROS Services
 
         rospy.wait_for_service('mavros/cmd/arming')
@@ -116,8 +125,8 @@ class gymPX4(gym.Env):
         rospy.wait_for_service('mavros/set_stream_rate')
         set_stream_rate=rospy.ServiceProxy("mavros/set_stream_rate",StreamRate)
 
-        set_stream_rate(StreamRateRequest.STREAM_POSITION, 20, 1)
-        set_stream_rate(StreamRateRequest.STREAM_ALL, 20, 1)
+        set_stream_rate(StreamRateRequest.STREAM_POSITION, 50, 1)
+        set_stream_rate(StreamRateRequest.STREAM_ALL, 50, 1)
 
         self.setpoint_msg = mavros.setpoint.PoseStamped(header=mavros.setpoint.Header(frame_id="att_pose",stamp=rospy.Time.now()),)
 
@@ -130,16 +139,15 @@ class gymPX4(gym.Env):
         rospy.init_node('gym_px4_mavros',anonymous=True)
         print ('connected')
 
-    def reset(self):
 
-        # unpause()
+    def reset(self):
 
         self.success_steps = 0
         self.steps=0
         reset_steps = 0
 
-        # self.desired = np.random.randint(2,10)
-        # self.initial = np.random.randint(2,10)
+#         self.desired = np.random.randint(2,10)
+#         self.initial = np.random.randint(2,10)
 
         self.desired = 2
         self.initial = 2
@@ -150,7 +158,7 @@ class gymPX4(gym.Env):
 
         print('-- Resetting position')
         
-		### wait for quad to arrive to desired position
+	### wait for quad to arrive to desired position
         while True:
 
             if self.current_state.armed == False:    ## if not armed (e.g. crash landing disarm), re-arm
@@ -183,7 +191,7 @@ class gymPX4(gym.Env):
 
         print('-------- Position reset --------') 
 
-        ob = np.array([ self.desired - lin_pos[2] ])
+        ob = np.array([ self.desired - lin_pos[2] , lin_vel[2] ])
 
         self.last_pos = lin_pos
 
@@ -194,7 +202,8 @@ class gymPX4(gym.Env):
         start_time=time.time()
         rate = rospy.Rate(20)
 
-		### recieve updated position and velocity
+
+	### recieve updated position and velocity
         qx=self.local_position.pose.orientation.x
         qy=self.local_position.pose.orientation.y
         qz=self.local_position.pose.orientation.z
@@ -203,27 +212,21 @@ class gymPX4(gym.Env):
         roll, pitch, yaw = quaternion_to_euler(qx,qy,qz,qw)
         ang_pos = [roll, pitch, yaw]
 
-        
-
         while True:
-            # st = time.time()
             x=self.local_position.pose.position.x
             y=self.local_position.pose.position.y
             z=self.local_position.pose.position.z
             lin_pos = [x,y,z]
             if lin_pos[2] != self.last_pos[2]:
-                # st = time.time() - st
-                # print(lin_pos)
-                # print(st)
                 self.last_pos = lin_pos
                 break
-
+    
         vx=self.local_velocity.twist.linear.x
         vy=self.local_velocity.twist.linear.y
         vz=self.local_velocity.twist.linear.z
         lin_vel = [vx,vy,vz]
 
-		# ### send actuator control commands
+	# ### send actuator control commands
         # self.act_controls.group_mix=0
         # self.act_controls.controls[0]=0
         # self.act_controls.controls[1]=0
@@ -246,7 +249,7 @@ class gymPX4(gym.Env):
 
         reward = -np.power( self.desired - lin_pos[2], 2)
 
-        ob = np.array([ self.desired - lin_pos[2] ])
+        ob = np.array([ self.desired - lin_pos[2] , lin_vel[2]] )
         
         done = False
         reset = 'No'
@@ -264,7 +267,7 @@ class gymPX4(gym.Env):
 
         if  np.abs(ob[0]) < 0.1 :
             self.success_steps+=1
-            if self.success_steps > 150:
+            if self.success_steps > 50:
                 done = True
                 reset = 'sim success'
                 print('----------------', reset, '----------------')
@@ -283,12 +286,24 @@ class gymPX4(gym.Env):
 
         rate.sleep()
 
+        # print('state: ', ob , 'action: ', action , 'reward: ', reward, 'time: ', step_len)
+
         info = {"state" : ob, "action": action, "reward": reward, "step": self.steps, "step length": step_len, "reset reason": reset}
         return ob, reward, done, info
 
     def offb_arm(self):
 
+        last_request = rospy.Time.now()
+
+        flag1 = False
+        flag2 = False
+
+        prev_imu_data = Imu()
+        prev_time = rospy.Time.now()
+        count = 0
+
         print ('-- Enabling offboard mode and arming')
+
         rospy.wait_for_service('mavros/set_mode')
         self.set_mode_client(0,'OFFBOARD')
         self.arming_client(True)
@@ -315,3 +330,11 @@ class gymPX4(gym.Env):
 
     def act_cb(self,data):
         self.act_controls = data
+
+    def gv_cb(self,data):
+        self.global_velocity = data
+
+    def ra_cb(self,data):
+        self.relative_altitude = data
+
+
