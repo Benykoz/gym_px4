@@ -50,6 +50,8 @@ python -m gym_reinmav.run --alg=ppo2 --env=gym_px4:px4-v0 --network=mlp --num_ti
 
 The environment uses the /mavros/setpoint_raw/ publisher to control the drone. For the moment the it is modified for control on the z axis only. (meaning roll, pitch and yaw set point are ignored)
 
+*** sometimes mavros has trouble switching to offboard mode, not sure what's the source of this bug but you can manually switch to offboard (e.g. using QGroundControl) ***
+
 you can easily modify for control around all axis by modifying gymPX4_env.py
 
 Action space = thrust[0..1]] 
