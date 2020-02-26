@@ -24,7 +24,7 @@ run 'sudo pip3 install gym'
 clone/download the repo and install the package using pip install -e gym-px4
 
 # Using the Environment
-Navigate to the px4 Firmware diractory and run `make px4_sitl gazebo`.
+Navigate to the px4 Firmware diractory and run gazebo with ros wrappers (instructions here: https://dev.px4.io/v1.9.0/en/simulation/ros_interface.html).
 In a new terminal run `roslaunch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"`
 
 Then the environment can be used as anyother gym environments. This can be done by doing the following in your script
@@ -36,7 +36,7 @@ env = gym.make('gym_px4:px4-v0')
 ...
 env.reset()
 ...
-env.step(ac)
+env.step(action)
 ```
 
 `gym_px4:px4-v0-v0` is the environment ID that is registered in the gym environment.
@@ -47,13 +47,11 @@ python -m gym_reinmav.run --alg=ppo2 --env=gym_px4:px4-v0 --network=mlp --num_ti
 
 ## Additional notes
 
-The environment uses the /mavros/setpoint_raw/ publisher to control the drone. For the moment the it is modified for control on the z axis only. (meaning roll, pitch and yaw set point are ignored)
+The environment gets information from different mavros topics and uses the /mavros/setpoint_raw/ publisher to control the drone. 
 
-*** sometimes mavros has trouble switching to offboard mode, not sure what's the source of this bug but you can manually switch to offboard (e.g. using QGroundControl) ***
+*** sometimes mavros has trouble switching to offboard mode, not sure what's the source of this bug but you can manually switch to offboard (e.g. using consule commander (run 'commander offboard' in px4 consule or simply using QGroundControl) ***
 
-you can easily modify for control around all axis by modifying gymPX4_env.py
+Action space = thrust[0..1], roll[-1..1], pitch[-1..1], yaw[-1..1]
 
-Action space = thrust[0..1]] 
-
-Observation space = linear position[x,y,z]
+Observation space = [ linear position[x,y,z], linear velocity[x,y,z], linear acceleration[x,y,z], angular_position[roll,pitch,yaw], angular_velocity[roll,pitch,yaw] ]
 
