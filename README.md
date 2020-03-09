@@ -21,7 +21,7 @@ run 'sudo pip3 install gym'
 
 
 ## Install gym_px4:
-clone/download the repo and install the package using pip install -e gym-px4
+clone/download the repo and install the package using pip install -e gym_px4
 
 # Using the Environment
 Navigate to the px4 Firmware diractory and run gazebo with ros wrappers (instructions here: https://dev.px4.io/v1.9.0/en/simulation/ros_interface.html).
