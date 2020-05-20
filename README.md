@@ -10,6 +10,9 @@
       *to troubleshoot python3 - ROS issues, I recommend https://medium.com/@beta_b0t/how-to-setup-ros-with-python-3-44a69ca36674
 - [gazebo9]
 - [gym](https://github.com/openai/gym.git) 
+mpi
+opencv-python
+joblib
 
 Note1. the code was tested on Ubuntu 18.04.
 
