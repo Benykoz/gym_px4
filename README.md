@@ -45,7 +45,7 @@ env.step(action)
 `gym_px4:px4-v0-v0` is the environment ID that is registered in the gym environment.
 The environment can be also be tested using the openai baselines package, for example as the following.
 ```
-python -m gym_reinmav.run --alg=ppo2 --env=gym_px4:px4-v0 --network=mlp --num_timesteps=2e7
+
 ```
 
 ## Additional notes
